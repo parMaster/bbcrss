@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	// ErrAlreadyExists is returned when item already exists in DB
+	// ErrAlreadyExists is returned when item already exists in DB (unique constraint violation)
 	ErrAlreadyExists = errors.New("item already exists")
 )
 
@@ -19,7 +19,7 @@ type Storage struct {
 	db *sql.DB
 }
 
-func NewStorage(cfg Config) (*Storage, error) {
+func NewStorage(cfg *Config) (*Storage, error) {
 	db, err := openDB(cfg)
 	if err != nil {
 		return nil, err
@@ -28,13 +28,17 @@ func NewStorage(cfg Config) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-// SaveItem saves news item to DB. Minimum required fields are Title and Link
-func (s *Storage) SaveItem(ctx context.Context, item *NewsItem) error {
+// CreateNews saves news item to DB. Minimum required fields are Title and Link
+func (s *Storage) CreateNews(ctx context.Context, item *NewsItem) error {
+
+	if item == nil || item.Title == "" || item.Link == "" {
+		return errors.New("item is empty")
+	}
 
 	args := []any{item.Title, item.Link}
 
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO news (title, link) 
+		`INSERT INTO news (title, link)
 		VALUES ($1, $2)
 		RETURNING id`,
 		args...).Scan(&item.ID)
@@ -50,13 +54,36 @@ func (s *Storage) SaveItem(ctx context.Context, item *NewsItem) error {
 	return err
 }
 
+// GetNews returns news item by Link
+func (s *Storage) GetNews(ctx context.Context, link string) (*NewsItem, error) {
+	item := NewsItem{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, title, link, description, image FROM news WHERE link = $1`,
+		link).Scan(&item.ID, &item.Title, &item.Link, &item.Description, &item.Image)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &item, nil
+}
+
+// SaveNews updates news item in DB
+func (s *Storage) SaveNews(ctx context.Context, item *NewsItem) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE news SET title = $1, link = $2, description = $3, image = $4 WHERE id = $5`,
+		item.Title, item.Link, item.Description, item.Image, item.ID)
+
+	return err
+}
+
 // Close closes DB connection
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
 // openDB opens connection to PostgreSQL DB, pings it and returns connection
-func openDB(cfg Config) (*sql.DB, error) {
+func openDB(cfg *Config) (*sql.DB, error) {
 	db, err := sql.Open("postgres", cfg.DB.Dsn)
 	if err != nil {
 		return nil, err
