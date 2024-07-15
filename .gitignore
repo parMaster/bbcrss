@@ -7,19 +7,8 @@
 
 # Test binary, built with `go test -c`
 *.test
-# test db
-*.db
-*.db-shm
-*.db-wal
 
 .tmp/
-
-# ignore configs with secrets
-config/config_dbg.yml
-config/config.yml
-
-# binaries and distribution artifacts
-dist/
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -33,7 +22,3 @@ dist/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-
-# build files
-zoomrs
-zoomrs.exe
