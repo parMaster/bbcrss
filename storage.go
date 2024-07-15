@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/lib/pq"
@@ -28,18 +29,18 @@ func NewStorage(cfg *Config) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-// CreateNews saves news item to DB. Minimum required fields are Title and Link
-func (s *Storage) CreateNews(ctx context.Context, item *NewsItem) error {
+// CreateNewsItem saves news item to DB. Minimum required fields are Title and Link
+func (s *Storage) CreateNewsItem(ctx context.Context, item *NewsItem) error {
 
 	if item == nil || item.Title == "" || item.Link == "" {
 		return errors.New("item is empty")
 	}
 
-	args := []any{item.Title, item.Link}
+	args := []any{item.Title, item.Link, item.Published}
 
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO news (title, link)
-		VALUES ($1, $2)
+		`INSERT INTO news (title, link, published)
+		VALUES ($1, $2, $3::timestamp)
 		RETURNING id`,
 		args...).Scan(&item.ID)
 
@@ -54,12 +55,12 @@ func (s *Storage) CreateNews(ctx context.Context, item *NewsItem) error {
 	return err
 }
 
-// GetNews returns news item by Link
-func (s *Storage) GetNews(ctx context.Context, link string) (*NewsItem, error) {
+// GetNewsItem returns news item by Link
+func (s *Storage) GetNewsItem(ctx context.Context, link string) (*NewsItem, error) {
 	item := NewsItem{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, link, description, image FROM news WHERE link = $1`,
-		link).Scan(&item.ID, &item.Title, &item.Link, &item.Description, &item.Image)
+		`SELECT id, title, link, published, description, image FROM news WHERE link = $1`,
+		link).Scan(&item.ID, &item.Title, &item.Link, &item.Published, &item.Description, &item.Image)
 
 	if err != nil {
 		return nil, err
@@ -68,13 +69,39 @@ func (s *Storage) GetNews(ctx context.Context, link string) (*NewsItem, error) {
 	return &item, nil
 }
 
-// SaveNews updates news item in DB
-func (s *Storage) SaveNews(ctx context.Context, item *NewsItem) error {
+// SaveNewsItem updates news item in DB
+func (s *Storage) SaveNewsItem(ctx context.Context, item *NewsItem) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE news SET title = $1, link = $2, description = $3, image = $4 WHERE id = $5`,
 		item.Title, item.Link, item.Description, item.Image, item.ID)
 
 	return err
+}
+
+func (s *Storage) GetNews(ctx context.Context) ([]NewsItem, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, title, link, published, description, image FROM news`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("failed to close rows: %v", err)
+		}
+	}()
+
+	items := []NewsItem{}
+	for rows.Next() {
+		item := NewsItem{}
+		err = rows.Scan(&item.ID, &item.Title, &item.Link, &item.Published, &item.Description, &item.Image)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, nil
 }
 
 // Close closes DB connection

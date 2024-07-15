@@ -62,8 +62,8 @@ func (p *Parser) parseRSS(feedBody string) ([]NewsItem, error) {
 	}
 
 	for _, item := range feed.Items {
-		// log.Printf("item %d: %+v \n\n", i, item)
-		items = append(items, NewsItem{Title: item.Title, Link: item.Link})
+		// log.Printf("item: %+v \n\n", item)
+		items = append(items, NewsItem{Title: item.Title, Link: item.Link, Published: *item.PublishedParsed})
 	}
 
 	return items, nil

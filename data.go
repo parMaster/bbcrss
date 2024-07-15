@@ -1,11 +1,13 @@
 package main
 
+import "time"
+
 // NewsItem represents news item
 type NewsItem struct {
-	ID    int
-	Title string
-	Link  string
-	// Published time.Time
+	ID          int
+	Title       string
+	Link        string
+	Published   time.Time
 	Description string
 	Image       string
 }

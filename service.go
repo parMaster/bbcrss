@@ -53,12 +53,12 @@ func (s *Service) ParsingJob(ctx context.Context) {
 		log.Println("parsing RSS feed")
 		items, err := s.Parser.GetNews(ctx)
 		if err != nil {
-			log.Printf("failed to parse RSS: %v, retrying in 30 sec %d/%d", err, retry, limit)
-			retry++
 			if retry > limit {
 				log.Printf("failed to parse RSS: %v, exiting", err)
 				return
 			}
+			log.Printf("failed to parse RSS: %v, retrying in 30 sec %d/%d", err, retry, limit)
+			retry++
 			select {
 			case <-ctx.Done():
 				return
@@ -72,7 +72,7 @@ func (s *Service) ParsingJob(ctx context.Context) {
 		// Saving items to DB
 		saved, skipped := 0, 0
 		for _, item := range items {
-			err := s.Storage.CreateNews(ctx, &item)
+			err := s.Storage.CreateNewsItem(ctx, &item)
 			if err != nil {
 				if errors.Is(err, ErrAlreadyExists) {
 					log.Printf("[DEBUG] item already exists: %v", item)
@@ -87,7 +87,10 @@ func (s *Service) ParsingJob(ctx context.Context) {
 			log.Printf("[DEBUG] item saved: %v", item)
 
 			// publish item link to the queue
-			s.Mq.Publish([]byte(item.Link))
+			err = s.Mq.Publish([]byte(item.Link))
+			if err != nil {
+				log.Printf("[ERROR] failed to publish to queue: %v", err)
+			}
 		}
 		log.Printf("[INFO] %d news saved, %d duplicates skipped", saved, skipped)
 
@@ -115,7 +118,7 @@ func (s *Service) EnrichmentJob(ctx context.Context) {
 		log.Printf("[DEBUG] enriching news: %s", link)
 
 		// get news item from DB
-		newsItem, err := s.Storage.GetNews(ctx, link)
+		newsItem, err := s.Storage.GetNewsItem(ctx, link)
 		if err != nil {
 			log.Printf("[ERROR] failed to get item from DB: %v", err)
 			continue
@@ -130,7 +133,7 @@ func (s *Service) EnrichmentJob(ctx context.Context) {
 		log.Printf("[DEBUG] %d enrichments applied", applied)
 
 		// save enriched news item
-		err = s.Storage.SaveNews(ctx, newsItem)
+		err = s.Storage.SaveNewsItem(ctx, newsItem)
 		if err != nil {
 			log.Printf("[ERROR] failed to save item: %v", err)
 			continue
@@ -141,7 +144,7 @@ func (s *Service) EnrichmentJob(ctx context.Context) {
 }
 
 // Run starts the service and waits for termination signal
-// Parsing and enrichment job runs in background
+// Parsing and Enrichment jobs run in background
 func (s *Service) Run(ctx context.Context) {
 
 	go s.ParsingJob(ctx)
@@ -150,7 +153,13 @@ func (s *Service) Run(ctx context.Context) {
 
 	// wait for termination signal
 	<-ctx.Done()
-	err := s.Storage.Close()
+
+	err := s.Mq.Close()
+	if err != nil {
+		log.Printf("failed to close RabbitMQ: %v", err)
+	}
+
+	err = s.Storage.Close()
 	if err != nil {
 		log.Printf("failed to close storage: %v", err)
 	}
