@@ -9,31 +9,38 @@ import (
 )
 
 type Service struct {
-	cfg     *Config
-	Parser  *Parser
-	Storage *Storage
-	Mq      *Mq
+	cfg       *Config
+	Parser    *Parser
+	Storage   *Storage
+	ApiServer *APIServer
+	Mq        *Mq
 }
 
 func NewService(cfg *Config) (*Service, error) {
 
 	parser := NewParser(cfg)
 
-	storage, err := NewStorage(cfg)
+	storage, err := NewStorage(cfg.DB)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start storage: %w", err)
 	}
 
-	mq, err := NewMq(cfg)
+	mq, err := NewMq(cfg.RMQ)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start RabbitMQ: %w", err)
 	}
 
+	api, err := NewAPIServer(storage, cfg.API)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start API server: %w", err)
+	}
+
 	return &Service{
-		cfg:     cfg,
-		Parser:  parser,
-		Storage: storage,
-		Mq:      mq,
+		cfg:       cfg,
+		Parser:    parser,
+		Storage:   storage,
+		Mq:        mq,
+		ApiServer: api,
 	}, nil
 }
 
@@ -54,7 +61,7 @@ func (s *Service) ParsingJob(ctx context.Context) {
 		items, err := s.Parser.GetNews(ctx)
 		if err != nil {
 			if retry > limit {
-				log.Printf("failed to parse RSS: %v, exiting", err)
+				log.Printf("[ERROR] failed to parse RSS: %v, exiting", err)
 				return
 			}
 			log.Printf("failed to parse RSS: %v, retrying in 30 sec %d/%d", err, retry, limit)
@@ -150,6 +157,8 @@ func (s *Service) Run(ctx context.Context) {
 	go s.ParsingJob(ctx)
 
 	go s.EnrichmentJob(ctx)
+
+	go s.ApiServer.Run(ctx)
 
 	// wait for termination signal
 	<-ctx.Done()

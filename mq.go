@@ -14,8 +14,8 @@ type Mq struct {
 }
 
 // NewMq creates new connection to RabbitMQ
-func NewMq(cfg *Config) (*Mq, error) {
-	conn, err := amqp.Dial(cfg.RmqDsn)
+func NewMq(cfg RMQConfig) (*Mq, error) {
+	conn, err := amqp.Dial(cfg.Dsn)
 	if err != nil {
 		return nil, fmt.Errorf("[ERROR] failed to connect to RabbitMQ %w", err)
 	}
@@ -27,18 +27,18 @@ func NewMq(cfg *Config) (*Mq, error) {
 
 	// declare a queue for news items with default settings
 	_, err = ch.QueueDeclare(
-		cfg.RmqName, // name
-		false,       // durable
-		false,       // delete when unused
-		false,       // exclusive
-		false,       // no-wait
-		nil,         // arguments
+		cfg.Name, // name
+		false,    // durable
+		false,    // delete when unused
+		false,    // exclusive
+		false,    // no-wait
+		nil,      // arguments
 	)
 	if err != nil {
 		return nil, fmt.Errorf("[ERROR] failed to declare a queue %w", err)
 	}
 
-	return &Mq{name: cfg.RmqName, conn: conn, ch: ch}, nil
+	return &Mq{name: cfg.Name, conn: conn, ch: ch}, nil
 }
 
 // Close closes connection to RabbitMQ

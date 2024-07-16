@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .article-image {
+            max-height: 400px;
+            object-fit: cover;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{unescape .Title}}</li>
+            </ol>
+        </nav>
+
+        <article>
+            <h1 class="mb-4">{{.Title}}</h1>
+            
+            <p class="text-muted">
+                <small>Published on: {{dateStr .Published}}</small>
+            </p>
+
+            <img src="{{.Image}}" class="img-fluid mb-4 article-image" alt="{{.Title}}">
+
+            <div class="article-content">
+                <p>{{unescape .Description}}</p>
+            </div>
+        </article>
+
+        <div class="mt-5">
+            <a href="/" class="btn btn-secondary">&laquo; Back to Latest News</a>
+        </div>
+    </div>
+</body>
+</html>
