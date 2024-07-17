@@ -155,7 +155,7 @@ func (s *Service) EnrichNewsItem(ctx context.Context, link string) error {
 		return fmt.Errorf("failed to save item: %w", err)
 	}
 
-	log.Printf("[DEBUG] item saved: %v", newsItem)
+	// log.Printf("[DEBUG] item saved: %v", newsItem)
 	return nil
 }
 

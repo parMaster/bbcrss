@@ -64,6 +64,8 @@ func (api *APIServer) Run(ctx context.Context) error {
 	return nil
 }
 
+// listNews fetches news from storage and returns it with metadata
+// filters validated are used to paginate and filter news
 func (api *APIServer) listNews(ctx context.Context, filters Filters) ([]NewsItem, Metadata, error) {
 	filters.validate(defaultFilters)
 
@@ -76,6 +78,7 @@ func (api *APIServer) listNews(ctx context.Context, filters Filters) ([]NewsItem
 	return items, meta, nil
 }
 
+// getSingleNews fetches single news item by id
 func (api *APIServer) getSingleNews(ctx context.Context, id int) (*NewsItem, error) {
 	item, err := api.Storage.GetSingleNews(ctx, id)
 	if err != nil {
@@ -102,6 +105,7 @@ func (api *APIServer) router(ctx context.Context) http.Handler {
 
 // Web UI handlers
 
+// funcMap is a map of functions to be used in templates
 var funcMap = template.FuncMap{
 	"sub":      func(a, b int) int { return a - b },
 	"add":      func(a, b int) int { return a + b },
@@ -139,10 +143,7 @@ func (api *APIServer) indexHandler(ctx context.Context) func(http.ResponseWriter
 			Metadata: meta,
 		}
 
-		// load ./web/index.html as a template
 		tpl := template.Must(template.New("index.html").Funcs(funcMap).ParseFS(web, "web/index.html"))
-
-		// render it with data from envelope
 
 		err = tpl.Execute(w, envelope)
 		if err != nil {

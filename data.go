@@ -23,6 +23,7 @@ type Metadata struct {
 	TotalRecords int `json:"total_records,omitempty"`
 }
 
+// calculateMetadata calculates metadata for pagination
 func calculateMetadata(totalRecords, page, pageSize int) Metadata {
 	if totalRecords == 0 {
 		return Metadata{}
@@ -38,7 +39,7 @@ func calculateMetadata(totalRecords, page, pageSize int) Metadata {
 }
 
 // Filters represents filters for news items
-// ?page=1&page_size=5
+// ?page=1&pagesize=5
 type Filters struct {
 	Page     int
 	PageSize int
@@ -49,6 +50,7 @@ var defaultFilters = Filters{
 	PageSize: 5,
 }
 
+// validate validates filters and sets default values if needed
 func (f *Filters) validate(defaultFilters Filters) {
 	if f.Page < 1 {
 		f.Page = defaultFilters.Page
@@ -58,10 +60,12 @@ func (f *Filters) validate(defaultFilters Filters) {
 	}
 }
 
+// limit returns limit for SQL query
 func (f Filters) limit() int {
 	return f.PageSize
 }
 
+// offset returns offset for SQL query
 func (f Filters) offset() int {
 	offset := (f.Page - 1) * f.PageSize
 	return min(offset, math.MaxInt)
