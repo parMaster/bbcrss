@@ -15,6 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// SetupPgContainer starts a new postgres container for testing
 func SetupPgContainer(ctx context.Context, t *testing.T) (*DBConfig, error) {
 	req := testcontainers.ContainerRequest{
 		Image:        "postgres:14",
@@ -60,6 +61,7 @@ func SetupPgContainer(ctx context.Context, t *testing.T) (*DBConfig, error) {
 	return &cfg, nil
 }
 
+// migrateDb applies or rolls back migrations
 func migrateDb(cfg *DBConfig, act string) error {
 
 	db, err := openDB(*cfg)
@@ -94,7 +96,7 @@ func migrateDb(cfg *DBConfig, act string) error {
 	return nil
 }
 
-func TestWithPostgres(t *testing.T) {
+func TestStorage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -148,11 +150,15 @@ func TestWithPostgres(t *testing.T) {
 	})
 	assert.ErrorIs(t, err, ErrAlreadyExists)
 
-	// Test GetNewsItems
+	// Test GetNewsItem
 	dbItem, err := store.GetNewsItem(ctx, validItem.Link)
 	assert.NoError(t, err)
 	assert.Equal(t, validItem.Title, dbItem.Title)
 	assert.Equal(t, validItem.Link, dbItem.Link)
+
+	// Test GetNewsItem with invalid link
+	_, err = store.GetNewsItem(ctx, "invalid_link")
+	assert.ErrorIs(t, err, ErrNotFound)
 
 	// Test SaveNewsItem
 	validItem.Title = "updated_title"
@@ -170,10 +176,19 @@ func TestWithPostgres(t *testing.T) {
 	assert.Equal(t, validItem.Image, dbItem.Image)
 	assert.Equal(t, validItem.Description, dbItem.Description)
 
-	// Test GetSingleNews
-	_, err = store.GetSingleNews(ctx, 0)
+	// Test SaveNewsItem with invalid ID
+	invalidItem := validItem
+	invalidItem.ID = 0
+	err = store.SaveNewsItem(ctx, &invalidItem)
 	assert.ErrorIs(t, err, ErrNotFound)
 
+	// Test GetSingleNews
+
+	// Test GetSingleNews with invalid ID
+	_, err = store.GetSingleNews(ctx, invalidItem.ID)
+	assert.ErrorIs(t, err, ErrNotFound)
+
+	// Test GetSingleNews with valid ID
 	retrieved, err := store.GetSingleNews(ctx, validItem.ID)
 	assert.NoError(t, err)
 
@@ -195,26 +210,28 @@ func TestWithPostgres(t *testing.T) {
 	items, meta, err := store.GetNews(ctx, Filters{Page: 1, PageSize: 10})
 	assert.NoError(t, err)
 	assert.Len(t, items, 2)
-	assert.Equal(t, 2, meta.TotalRecords)
+	assert.Equal(t, 2, meta.TotalRecords) // 2 items in the database now
 	assert.Equal(t, 1, meta.CurrentPage)
 
 	// Test GetNews with pagination
+	// page 1 (1 item)
 	items, meta, err = store.GetNews(ctx, Filters{Page: 1, PageSize: 1})
 	assert.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, 2, meta.TotalRecords)
 	assert.Equal(t, 1, meta.CurrentPage)
 
+	// page 2 (1 item)
 	items, meta, err = store.GetNews(ctx, Filters{Page: 2, PageSize: 1})
 	assert.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, 2, meta.TotalRecords)
 	assert.Equal(t, 2, meta.CurrentPage)
 
+	// page 3 (0 items)
 	items, meta, err = store.GetNews(ctx, Filters{Page: 3, PageSize: 1})
 	assert.NoError(t, err)
 	assert.Len(t, items, 0)
 	assert.Equal(t, 0, meta.TotalRecords) // rows.Next() returned false
 	assert.Equal(t, 0, meta.CurrentPage)
-
 }

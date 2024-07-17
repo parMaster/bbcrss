@@ -83,13 +83,24 @@ func (s *Storage) GetNewsItem(ctx context.Context, link string) (*NewsItem, erro
 
 // SaveNewsItem updates news item in DB
 func (s *Storage) SaveNewsItem(ctx context.Context, item *NewsItem) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE news SET title = $1, link = $2, description = $3, image = $4 WHERE id = $5`,
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE news SET title = $1, link = $2, description = $3, image = $4 WHERE id = $5
+		RETURNING id
+		`,
 		item.Title,
 		item.Link,
 		item.Description,
 		item.Image,
 		item.ID)
+
+	if err != nil {
+		return err
+	}
+
+	affected, err := res.RowsAffected()
+	if affected == 0 {
+		return ErrNotFound
+	}
 
 	return err
 }
