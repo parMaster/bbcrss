@@ -158,7 +158,13 @@ func (s *Service) Run(ctx context.Context) {
 
 	go s.EnrichmentJob(ctx)
 
-	go s.ApiServer.Run(ctx)
+	go func() {
+		err := s.ApiServer.Run(ctx)
+		if err != nil {
+			log.Printf("failed to start API server: %v", err)
+			return
+		}
+	}()
 
 	// wait for termination signal
 	<-ctx.Done()

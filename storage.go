@@ -152,6 +152,9 @@ func (s *Storage) GetSingleNews(ctx context.Context, id int) (*NewsItem, error) 
 		&item.Image)
 
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 
