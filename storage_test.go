@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"testing"
@@ -30,14 +29,15 @@ func SetupPgContainer(ctx context.Context, t *testing.T) (*DBConfig, error) {
 		Started:          true,
 	})
 	if err != nil {
-		log.Fatalf("Could not start redis: %s", err)
+		log.Fatalf("Could not start rabbit: %s", err)
 	}
 	// Terminate the container when the test finishes
 	go func() {
 		<-ctx.Done()
 
+		time.Sleep(2 * time.Second) // dirty hack to avoid "database system is shut down" error
 		if err := postgresC.Terminate(ctx); err != nil {
-			log.Fatalf("Could not stop redis: %s", err)
+			log.Printf("Could not stop postgres: %s", err)
 		}
 	}()
 
@@ -101,14 +101,17 @@ func TestWithPostgres(t *testing.T) {
 	cfg, err := SetupPgContainer(ctx, t)
 	assert.NoError(t, err)
 
-	// Test database connection
-	db, err := sql.Open("postgres", cfg.Dsn)
-	assert.NoError(t, err)
-	defer db.Close()
-
 	// Apply migrations
 	err = migrateDb(cfg, "up")
 	assert.NoError(t, err)
+
+	// Migrate down on test finish
+	defer func() {
+		err := migrateDb(cfg, "down")
+		if err != nil {
+			log.Fatalf("failed to migrate down: %v", err)
+		}
+	}()
 
 	store, err := NewStorage(*cfg)
 	assert.NoError(t, err)

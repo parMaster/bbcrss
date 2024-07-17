@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"time"
@@ -62,8 +63,12 @@ func (p *Parser) parseRSS(feedBody string) ([]NewsItem, error) {
 	}
 
 	for _, item := range feed.Items {
-		// log.Printf("item: %+v \n\n", item)
-		items = append(items, NewsItem{Title: item.Title, Link: item.Link, Published: *item.PublishedParsed})
+		log.Printf("item: %+v \n\n", item)
+		newsItem := NewsItem{Title: item.Title, Link: item.Link}
+		if item.PublishedParsed != nil {
+			newsItem.Published = *item.PublishedParsed
+		}
+		items = append(items, newsItem)
 	}
 
 	return items, nil

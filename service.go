@@ -91,7 +91,7 @@ func (s *Service) ParsingJob(ctx context.Context) {
 			}
 			saved++
 
-			log.Printf("[DEBUG] item saved: %v", item)
+			// log.Printf("[DEBUG] item saved: %v", item)
 
 			// publish item link to the queue
 			err = s.Mq.Publish([]byte(item.Link))
@@ -124,30 +124,39 @@ func (s *Service) EnrichmentJob(ctx context.Context) {
 		link := string(msg.Body)
 		log.Printf("[DEBUG] enriching news: %s", link)
 
-		// get news item from DB
-		newsItem, err := s.Storage.GetNewsItem(ctx, link)
+		err := s.EnrichNewsItem(ctx, link)
 		if err != nil {
-			log.Printf("[ERROR] failed to get item from DB: %v", err)
-			continue
+			log.Printf("[ERROR] failed to enrich news: %v", err)
 		}
-
-		// enrich news item
-		applied, err := s.Parser.Enrich(ctx, newsItem)
-		if err != nil {
-			log.Printf("failed to enrich news: %v", err)
-			continue
-		}
-		log.Printf("[DEBUG] %d enrichments applied", applied)
-
-		// save enriched news item
-		err = s.Storage.SaveNewsItem(ctx, newsItem)
-		if err != nil {
-			log.Printf("[ERROR] failed to save item: %v", err)
-			continue
-		}
-
-		log.Printf("[DEBUG] item saved: %v", newsItem)
 	}
+}
+
+// EnrichNewsItem enriches news item with additional data
+func (s *Service) EnrichNewsItem(ctx context.Context, link string) error {
+	// get news item from DB
+	newsItem, err := s.Storage.GetNewsItem(ctx, link)
+	if err != nil {
+		log.Printf("[ERROR] failed to get item from DB: %v", err)
+		return fmt.Errorf("failed to get item from DB: %w", err)
+	}
+
+	// enrich news item
+	applied, err := s.Parser.Enrich(ctx, newsItem)
+	if err != nil {
+		log.Printf("failed to enrich news: %v", err)
+		return fmt.Errorf("failed to enrich news: %w", err)
+	}
+	log.Printf("[DEBUG] %d enrichments applied to id=%d", applied, newsItem.ID)
+
+	// save enriched news item
+	err = s.Storage.SaveNewsItem(ctx, newsItem)
+	if err != nil {
+		log.Printf("[ERROR] failed to save item: %v", err)
+		return fmt.Errorf("failed to save item: %w", err)
+	}
+
+	log.Printf("[DEBUG] item saved: %v", newsItem)
+	return nil
 }
 
 // Run starts the service and waits for termination signal

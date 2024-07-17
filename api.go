@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -96,9 +97,6 @@ func (api *APIServer) router(ctx context.Context) http.Handler {
 	router.Get("/", api.indexHandler(ctx))
 	router.Get("/article", api.articleHandler(ctx))
 
-	// REST API
-	router.Get("/v1/news", api.listNewsHandler(ctx))
-
 	return router
 }
 
@@ -168,6 +166,10 @@ func (api *APIServer) articleHandler(ctx context.Context) func(http.ResponseWrit
 		item, err := api.getSingleNews(ctx, id)
 		if err != nil {
 			log.Printf("failed to get single news: %v", err)
+			if errors.Is(err, ErrNotFound) {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -178,46 +180,5 @@ func (api *APIServer) articleHandler(ctx context.Context) func(http.ResponseWrit
 			log.Printf("failed to render template: %v", err)
 			return
 		}
-	}
-}
-
-// REST API handlers
-
-// listNewsHandler returns JSON list of news items
-func (api *APIServer) listNewsHandler(ctx context.Context) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		filters := Filters{}
-		pageStr := chi.URLParam(r, "page")
-		page, err := strconv.Atoi(pageStr)
-		if err != nil {
-			log.Printf("failed to parse page: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		pageSizeStr := chi.URLParam(r, "pagesize")
-		pageSize, err := strconv.Atoi(pageSizeStr)
-		if err != nil {
-			log.Printf("failed to parse page size: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		filters.Page = page
-		filters.PageSize = pageSize
-
-		news, meta, err := api.listNews(ctx, filters)
-		if err != nil {
-			log.Printf("failed to get listNews: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		envelope := map[string]interface{}{
-			"news":     news,
-			"metadata": meta,
-		}
-
-		rest.RenderJSON(w, envelope)
 	}
 }
